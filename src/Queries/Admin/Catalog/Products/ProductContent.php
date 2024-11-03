@@ -2,12 +2,20 @@
 
 namespace Webkul\GraphQLAPI\Queries\Admin\Catalog\Products;
 
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Webkul\BookingProduct\Models\BookingProduct;
+use Webkul\BookingProduct\Repositories\BookingProductRepository;
+use Webkul\BookingProduct\Repositories\BookingProductTableSlotRepository;
+use Webkul\BookingProduct\Repositories\BookingRepository;
 use Webkul\Customer\Repositories\WishlistRepository;
 use Webkul\GraphQLAPI\Queries\BaseFilter;
 use Webkul\Product\Helpers\ConfigurableOption as ProductConfigurableHelper;
 use Webkul\Product\Helpers\Review as ProductReviewHelper;
 use Webkul\Product\Helpers\View as ProductViewHelper;
 use Webkul\Product\Repositories\ProductRepository;
+use Webkul\BookingProduct\Helpers\TableSlot as TableSlotHelper;
 
 class ProductContent extends BaseFilter
 {
@@ -20,7 +28,11 @@ class ProductContent extends BaseFilter
         protected WishlistRepository $wishlistRepository,
         protected ProductViewHelper $productViewHelper,
         protected ProductReviewHelper $productReviewHelper,
-        protected ProductConfigurableHelper $productConfigurableHelper
+        protected ProductConfigurableHelper $productConfigurableHelper,
+        protected BookingProductRepository $bookingProductRepository,
+        protected TableSlotHelper $tableSlotHelper,
+        protected BookingProductTableSlotRepository $bookingProductTableSlotRepository,
+        protected BookingRepository $bookingRepository
     ) {}
 
     /**
@@ -356,5 +368,119 @@ class ProductContent extends BaseFilter
         }
 
         return null;
+    }
+
+    public function getFormattedTableSlots($product): mixed
+    {
+        //Log::channel('custom')->info('ProductContent getFormattedTableSlots', ['product' => $product]);
+        $bookingProduct = $this->bookingProductRepository->find($product->booking_product_id);
+
+        if (empty($bookingProduct)) {
+            return json_encode([
+                'data' => [],
+            ]);
+        }
+
+        $bookingProductSlot = $this->bookingProductTableSlotRepository->findOneByField('booking_product_id', $bookingProduct->id);
+
+        if (empty($bookingProductSlot->slots)) {
+            return json_encode([
+                'data' => [],
+            ]);
+        }
+
+        $requestedDate = Carbon::createFromTimeString(now()->format('Y-m-d') . ' 00:00:00');
+
+        $availableFrom = ! $bookingProduct->available_every_week && $bookingProduct->available_from
+            ? Carbon::createFromTimeString($bookingProduct->available_from)
+            : Carbon::now()->copy()->startOfDay();
+
+        $availableTo = ! $bookingProduct->available_every_week && $bookingProduct->available_from
+            ? Carbon::createFromTimeString($bookingProduct->available_to)
+            : Carbon::createFromTimeString('2080-01-01 00:00:00');
+
+        $timeDurations = $bookingProductSlot->same_slot_all_days
+            ? $bookingProductSlot->slots
+            : ($bookingProductSlot->slots[$requestedDate->format('w')] ?? []);
+
+        if (
+            $requestedDate < $availableFrom
+            || $requestedDate > $availableTo
+        ) {
+            return json_encode([
+                'data' => [],
+            ]);
+        }
+
+        $slots = [];
+
+        foreach ($timeDurations as $index => $timeDuration) {
+            $fromChunks = explode(':', $timeDuration['from']);
+            $toChunks = explode(':', $timeDuration['to']);
+
+            $startDayTime = Carbon::createFromTimeString($requestedDate->format('Y-m-d').' 00:00:00')
+                ->addMinutes($fromChunks[0] * 60 + $fromChunks[1]);
+
+            $tempStartDayTime = clone $startDayTime;
+
+            $endDayTime = Carbon::createFromTimeString($requestedDate->format('Y-m-d').' 00:00:00')
+                ->addMinutes($toChunks[0] * 60 + $toChunks[1]);
+
+            $isFirstIteration = true;
+
+            while (1) {
+                $from = clone $tempStartDayTime;
+
+                $tempStartDayTime->addMinutes($bookingProductSlot->duration);
+
+                if ($isFirstIteration) {
+                    $isFirstIteration = false;
+                } else {
+                    $from->modify('+'.$bookingProductSlot->break_time.' minutes');
+                    $tempStartDayTime->modify('+'.$bookingProductSlot->break_time.' minutes');
+                }
+
+                $to = clone $tempStartDayTime;
+
+                if (
+                    $startDayTime <= $from
+                    && $from <= $availableTo
+                    && $availableTo >= $to
+                    && $to >= $startDayTime
+                    && $startDayTime <= $from
+                    && $from <= $endDayTime
+                    && $endDayTime >= $to
+                    && $to >= $startDayTime
+                ) {
+                    if (
+                        $qty = $timeDuration['qty'] ?? 1
+                        && Carbon::now() <= $from
+                    ) {
+                        $result = $this->bookingRepository->getModel()
+                            ->leftJoin('order_items', 'bookings.order_item_id', '=', 'order_items.id')
+                            ->addSelect(DB::raw('SUM(qty_ordered - qty_canceled - qty_refunded) as total_qty_booked'))
+                            ->where('bookings.product_id', $bookingProduct->product_id)
+                            ->where('bookings.from', $from->getTimestamp())
+                            ->where('bookings.to', $to->getTimestamp())
+                            ->where(DB::raw("JSON_EXTRACT(order_items.additional, '$.booking.slot')"), $from->getTimestamp().'-'.$to->getTimestamp())
+                            ->first();
+
+                        $slots[] = [
+                            'from'      => $from->format('h:i A'),
+                            'to'        => $to->format('h:i A'),
+                            'timestamp' => $from->getTimestamp().'-'.$to->getTimestamp(),
+                            'qty'       => $qty,
+                            'booked'    => $result->total_qty_booked ?? 0,
+                        ];
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return json_encode([
+            'data' => $slots,
+        ]);
     }
 }
