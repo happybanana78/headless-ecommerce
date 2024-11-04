@@ -372,7 +372,7 @@ class ProductContent extends BaseFilter
 
     public function getFormattedTableSlots($product): mixed
     {
-        //Log::channel('custom')->info('ProductContent getFormattedTableSlots', ['product' => $product]);
+        //Log::channel('api')->info('ProductContent getFormattedTableSlots', ['data' => $limit]);
         $bookingProduct = $this->bookingProductRepository->find($product->booking_product_id);
 
         if (empty($bookingProduct)) {
@@ -389,7 +389,10 @@ class ProductContent extends BaseFilter
             ]);
         }
 
-        $requestedDate = Carbon::createFromTimeString(now()->format('Y-m-d') . ' 00:00:00');
+        $requestQuery = request()->input('query');
+        preg_match('/\bkey: "slot_date",\s*value: "([\d-]+)"/', $requestQuery, $matches);
+        $tempDate = $matches[1] ?? now()->format('Y-m-d');
+        $requestedDate = Carbon::createFromTimeString($tempDate . ' 00:00:00');
 
         $availableFrom = ! $bookingProduct->available_every_week && $bookingProduct->available_from
             ? Carbon::createFromTimeString($bookingProduct->available_from)
@@ -452,10 +455,7 @@ class ProductContent extends BaseFilter
                     && $endDayTime >= $to
                     && $to >= $startDayTime
                 ) {
-                    if (
-                        $qty = $timeDuration['qty'] ?? 1
-                        && Carbon::now() <= $from
-                    ) {
+                    if (Carbon::now() <= $from) {
                         $result = $this->bookingRepository->getModel()
                             ->leftJoin('order_items', 'bookings.order_item_id', '=', 'order_items.id')
                             ->addSelect(DB::raw('SUM(qty_ordered - qty_canceled - qty_refunded) as total_qty_booked'))
@@ -469,7 +469,6 @@ class ProductContent extends BaseFilter
                             'from'      => $from->format('h:i A'),
                             'to'        => $to->format('h:i A'),
                             'timestamp' => $from->getTimestamp().'-'.$to->getTimestamp(),
-                            'qty'       => $qty,
                             'booked'    => $result->total_qty_booked ?? 0,
                         ];
                     }
