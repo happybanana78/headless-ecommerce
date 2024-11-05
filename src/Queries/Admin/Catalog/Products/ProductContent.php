@@ -19,7 +19,7 @@ use Webkul\BookingProduct\Helpers\TableSlot as TableSlotHelper;
 class ProductContent extends BaseFilter
 {
     /**
-     * Create a new controller instance.
+     * Create a new controller instance2.
      *
      * @return void
      */
