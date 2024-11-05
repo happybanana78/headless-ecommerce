@@ -26,5 +26,6 @@
             ],
             "aliases": {}
         }
-    }
+    },
+    "minimum-stability": "dev"
 }
