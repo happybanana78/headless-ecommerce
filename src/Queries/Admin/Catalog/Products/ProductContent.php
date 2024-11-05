@@ -4,7 +4,6 @@ namespace Webkul\GraphQLAPI\Queries\Admin\Catalog\Products;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Webkul\BookingProduct\Models\BookingProduct;
 use Webkul\BookingProduct\Repositories\BookingProductRepository;
 use Webkul\BookingProduct\Repositories\BookingProductTableSlotRepository;
