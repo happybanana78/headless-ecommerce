@@ -2,7 +2,6 @@
     "name": "bagisto/graphql-api",
     "description": "Bagisto GraphQL API",
     "license": "MIT",
-    "version": "1.0.0",
     "authors": [
         {
             "name": "Vivek Sharma",
