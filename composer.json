@@ -1,6 +1,6 @@
 {
-    "name": "fastconfig/bagisto-graphql-api",
-    "description": "Customized Bagisto GraphQL API for Fatconfig",
+    "name": "bagisto/graphql-api",
+    "description": "Bagisto GraphQL API",
     "license": "MIT",
     "authors": [
         {
