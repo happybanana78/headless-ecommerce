@@ -388,9 +388,8 @@ class ProductContent extends BaseFilter
             ]);
         }
 
-        $requestQuery = request()->input('query');
-        preg_match('/\bkey: "slot_date",\s*value: "([\d-]+)"/', $requestQuery, $matches);
-        $tempDate = $matches[1] ?? now()->format('Y-m-d');
+        $requestQuery = request()->input('variables');
+        $tempDate = $requestQuery['date'] ?? now()->format('Y-m-d');
         $requestedDate = Carbon::createFromTimeString($tempDate . ' 00:00:00');
 
         $availableFrom = ! $bookingProduct->available_every_week && $bookingProduct->available_from
