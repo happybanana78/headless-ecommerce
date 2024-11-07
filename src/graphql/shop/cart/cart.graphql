@@ -30,6 +30,9 @@ input AddItemToCartInput {
     productId: ID! @rename(attribute: "product_id")
     quantity: Int!
 
+    # Used in case of adding booking product to cart
+    booking: BookingInput!
+
     # Used in case of adding Grouped Product to Cart
     selectedConfigurableOption: Int @rename(attribute: "selected_configurable_option")
     superAttribute: [ConfigurableProductInput!] @rename(attribute: "super_attribute")
@@ -42,6 +45,12 @@ input AddItemToCartInput {
 
     # Used in case of adding Bundled Product to Cart
     bundleOptions: [BundledOptionsInput!] @rename(attribute: "bundle_options")
+}
+
+input BookingInput {
+    date: String!
+    slot: String!
+    note: String
 }
 
 input ConfigurableProductInput {
