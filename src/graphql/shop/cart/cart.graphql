@@ -166,7 +166,7 @@ type CartItem {
     appliedCartRuleIds: String @rename(attribute: "applied_cart_rule_ids")
     additional: ItemAdditional @field(resolver: "Webkul\\GraphQLAPI\\Queries\\Shop\\Common\\FilterItem@additional")
     createdAt: DateTime @rename(attribute: "created_at")
-    updatedAt: DateTime @rename(attribute: "updated_at")    
+    updatedAt: DateTime @rename(attribute: "updated_at")
     formattedPrice: FormattedPrice @field(resolver: "Webkul\\GraphQLAPI\\Queries\\Shop\\Common\\FormattedPrice@getCartItemPriceData")
     product: Product! @hasOne
     cart: Cart @hasOne

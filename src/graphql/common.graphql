@@ -48,6 +48,13 @@ type ItemAdditional {
     selectedConfigurableOption: ID @rename(attribute: "selected_configurable_option")
     superAttribute: [AdditionalSuperAttributes] @rename(attribute: "super_attribute")
     attributes: [AdditionalAttributes]
+    booking: CartItemBooking
+}
+
+type CartItemBooking {
+    date: Date
+    note: String
+    slot: String
 }
 
 input FilterCustomerAddressInput {

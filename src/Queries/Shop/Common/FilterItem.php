@@ -47,6 +47,12 @@ class FilterItem extends BaseFilter
             }
         }
 
+        // custom code start
+        if (isset($data['booking'])) {
+            $formattedData['booking'] = $data['booking'] ?? null;
+        }
+        // custom code end
+
         return $formattedData;
     }
 }
