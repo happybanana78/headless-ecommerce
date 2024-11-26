@@ -42,22 +42,14 @@ class CheckoutMutation extends Controller
     public function addresses(mixed $rootValue, array $args, GraphQLContext $context)
     {
         try {
-            $customer = bagisto_graphql()->authorize();
+            $cart = Cart::getCart();
 
-            $formattedAddresses = [];
-
-            foreach ($customer->addresses as $key => $address) {
-                $formattedAddresses[$key] = [
-                    'id'      => $address->id,
-                    'address' => "{$customer->first_name} {$customer->last_name}, {$address->address}, {$address->city}, {$address->state}, {$address->country}, {$address->postcode}, T: {$address->phone}",
-                ];
-            }
+            //$customer = bagisto_graphql()->authorize();
 
             return [
-                'is_guest'        => empty($customer),
-                'customer'        => $customer,
-                'addresses'       => $formattedAddresses,
-                'default_country' => config('app.default_country') ?? 'IN',
+                'is_guest'         => is_null($cart->customer_id),
+                'billing_address'  => $cart->billing_address ? $cart->billing_address->toArray() : null,
+                'shipping_address' => $cart->shipping_address ? $cart->shipping_address->toArray() : null,
             ];
         } catch (\Exception $e) {
             throw new CustomException($e->getMessage());
@@ -88,7 +80,7 @@ class CheckoutMutation extends Controller
 
         if (
             ! auth()->guard('api')->check()
-            && ! Cart::getCart()->hasGuestCheckoutItems()
+            && ! Cart::getCart()?->hasGuestCheckoutItems()
         ) {
             throw new CustomException(trans('bagisto_graphql::app.shop.checkout.addresses.guest-address-warning'));
         }

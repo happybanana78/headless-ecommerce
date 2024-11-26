@@ -5,12 +5,19 @@ extend type Query {
 
 type CheckoutAddresses {
     isGuest: Boolean @rename(attribute: "is_guest")
-    customer: Customer
-    addresses: [FormattedAddresses]
-    defaultCountry: String @rename(attribute: "default_country")
+    billingAddress: FormattedAddress @rename(attribute: "billing_address")
+    shippingAddress: FormattedAddress @rename(attribute: "shipping_address")
 }
 
-type FormattedAddresses {
-    id: Int
-    address: String
+type FormattedAddress {
+    companyName: String @rename(attribute: "company_name")
+    firstName: String! @rename(attribute: "first_name")
+    lastName: String! @rename(attribute: "last_name")
+    email: String!
+    address: String!
+    country: String!
+    state: String!
+    city: String!
+    postcode: String!
+    phone: String!
 }
