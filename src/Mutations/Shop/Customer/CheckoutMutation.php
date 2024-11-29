@@ -302,7 +302,7 @@ class CheckoutMutation extends Controller
         try {
             if (
                 Cart::hasError()
-                || ! Cart::saveShippingMethod($args['shipping_method'])
+//                || ! Cart::saveShippingMethod($args['shipping_method'])
             ) {
                 throw new CustomException(trans('bagisto_graphql::app.shop.checkout.payment.method-not-found'));
             }
