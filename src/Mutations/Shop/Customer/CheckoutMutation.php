@@ -296,7 +296,7 @@ class CheckoutMutation extends Controller
     public function paymentMethods(mixed $rootValue, array $args, GraphQLContext $context)
     {
         bagisto_graphql()->validate($args, [
-            'shipping_method' => 'string|required',
+            'shipping_method' => 'nullable|string',
         ]);
 
         try {

@@ -1,12 +1,12 @@
 # Shop\Checkout\PaymentMethods Related API
 extend type Query {
     paymentMethods(
-        input: PaymentMethodsInput! @spread
+        input: PaymentMethodsInput @spread
     ): PaymentMethods @field(resolver: "Webkul\\GraphQLAPI\\Mutations\\Shop\\Customer\\CheckoutMutation@paymentMethods")
 }
 
 input PaymentMethodsInput {
-    shippingMethod: String! @rename(attribute: "shipping_method")
+    shippingMethod: String @rename(attribute: "shipping_method")
 }
 
 type PaymentMethods {
