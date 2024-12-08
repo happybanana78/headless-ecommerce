@@ -24,6 +24,7 @@ class ContactUsMutation extends Controller
             'name'    => ['required', 'string', 'max:50'],
             'email'   => ['required', 'email'],
             'contact' => ['required', new PhoneNumber()],
+            'country' => ['nullable', 'string', 'max:50'],
             'message' => ['required', 'string', 'max:500'],
         ]);
 

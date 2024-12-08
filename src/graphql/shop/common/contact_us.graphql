@@ -9,5 +9,6 @@ input ContactUsInput {
     name: String
     email: String
     contact: String
+    country: String
     message: String
 }
