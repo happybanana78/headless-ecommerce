@@ -17,9 +17,7 @@ class ReviewQuery extends BaseFilter
         }
 
         $query->distinct()
-            ->select('product_reviews.*')
-            ->leftJoin('product_flat', 'product_reviews.product_id', '=', 'product_flat.product_id')
-            ->where('product_reviews.customer_id', $customer->id ?? null);
+            ->with(['product']);
 
         $filters = [
             'product_reviews.id'         => $input['id'] ?? null,
