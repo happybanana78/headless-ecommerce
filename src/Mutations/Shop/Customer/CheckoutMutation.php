@@ -12,6 +12,7 @@ use Webkul\Customer\Repositories\CustomerAddressRepository;
 use Webkul\GraphQLAPI\Repositories\NotificationRepository;
 use Webkul\GraphQLAPI\Validators\CustomException;
 use Webkul\Payment\Facades\Payment;
+use Webkul\Paypal\Payment\SmartButton;
 use Webkul\Sales\Repositories\OrderRepository;
 use Webkul\Sales\Transformers\OrderResource;
 use Webkul\Shipping\Facades\Shipping;
@@ -27,7 +28,8 @@ class CheckoutMutation extends Controller
         protected CartRuleCouponRepository $cartRuleCouponRepository,
         protected CustomerAddressRepository $customerAddressRepository,
         protected OrderRepository $orderRepository,
-        protected NotificationRepository $notificationRepository
+        protected NotificationRepository $notificationRepository,
+        protected SmartButton $smartButton,
     ) {
         Auth::setDefaultDriver('api');
     }
@@ -459,11 +461,16 @@ class CheckoutMutation extends Controller
 
             $cart = Cart::getCart();
 
-            if ($redirectUrl = Payment::getRedirectUrl($cart)) {
+            $redirectUrl = $cart->payment->method === 'paypal_smart_button' ?? null;
+
+            if ($redirectUrl) {
+                $requestBody = $this->buildRequestBody();
+                $paypalRedirectUrl = Payment::createPaypalOrder($cart, $requestBody);
+
                 return [
                     'success'         => true,
-                    'redirect_url'    => $redirectUrl,
-                    'selected_method' => $cart->payment->method,
+                    'redirect_url'    => $paypalRedirectUrl,
+                    'selected_method' => 'paypal_smart_button',
                 ];
             }
 
@@ -480,6 +487,48 @@ class CheckoutMutation extends Controller
             return [
                 'success'      => true,
                 'redirect_url' => null,
+                'order'        => $order,
+            ];
+        } catch (\Exception $e) {
+            throw new CustomException($e->getMessage());
+        }
+    }
+
+    /**
+     * Handle approved paypal order.
+     *
+     * @return array
+     */
+    public function paypalApproved(mixed $rootValue, array $args, GraphQLContext $context)
+    {
+        try {
+            if (Cart::hasError()) {
+                throw new CustomException(trans('bagisto_graphql::app.shop.checkout.error-placing-order'));
+            }
+
+            Cart::collectTotals();
+
+            $this->validateOrder();
+
+            $cart = Cart::getCart();
+
+            \Log::channel('custom')->info('code', [$args['code']]);
+
+            // Throws error if goes wrong
+            Payment::checkPaypalOrder($cart, $args['code']);
+
+            $data = (new OrderResource($cart))->jsonSerialize();
+
+            $order = $this->orderRepository->create($data);
+
+            if (core()->getConfigData('general.api.pushnotification.private_key')) {
+                $this->prepareNotificationContent($order);
+            }
+
+            Cart::deActivateCart();
+
+            return [
+                'success'      => true,
                 'order'        => $order,
             ];
         } catch (\Exception $e) {
@@ -543,5 +592,157 @@ class CheckoutMutation extends Controller
         ];
 
         $this->notificationRepository->sendNotification($data, $notification);
+    }
+
+    /**
+     * Build request body.
+     *
+     * @return array
+     */
+    private function buildRequestBody()
+    {
+        $cart = Cart::getCart();
+
+        $billingAddressLines = $this->getAddressLines($cart->billing_address->address);
+
+        $data = [
+            'intent' => 'CAPTURE',
+
+            'payer'  => [
+                'name' => [
+                    'given_name' => $cart->billing_address->first_name,
+                    'surname'    => $cart->billing_address->last_name,
+                ],
+
+                'address' => [
+                    'address_line_1' => current($billingAddressLines),
+                    'address_line_2' => last($billingAddressLines),
+                    'admin_area_2'   => $cart->billing_address->city,
+                    'admin_area_1'   => $cart->billing_address->state,
+                    'postal_code'    => $cart->billing_address->postcode,
+                    'country_code'   => $cart->billing_address->country,
+                ],
+
+                'email_address' => $cart->billing_address->email,
+            ],
+
+            'application_context' => [
+                'shipping_preference' => 'NO_SHIPPING',
+                'return_url' => config('app.url_front') . '/checkout-success',
+                'cancel_url' => config('app.url_front') . '/checkout-cancel',
+            ],
+
+            'purchase_units' => [
+                [
+                    'amount'   => [
+                        'value'         => $this->smartButton->formatCurrencyValue((float) $cart->sub_total + $cart->tax_total + ($cart->selected_shipping_rate ? $cart->selected_shipping_rate->price : 0) - $cart->discount_amount),
+                        'currency_code' => $cart->cart_currency_code,
+
+                        'breakdown'     => [
+                            'item_total' => [
+                                'currency_code' => $cart->cart_currency_code,
+                                'value'         => $this->smartButton->formatCurrencyValue((float) $cart->sub_total),
+                            ],
+
+                            'shipping'   => [
+                                'currency_code' => $cart->cart_currency_code,
+                                'value'         => $this->smartButton->formatCurrencyValue((float) ($cart->selected_shipping_rate ? $cart->selected_shipping_rate->price : 0)),
+                            ],
+
+                            'tax_total'  => [
+                                'currency_code' => $cart->cart_currency_code,
+                                'value'         => $this->smartButton->formatCurrencyValue((float) $cart->tax_total),
+                            ],
+
+                            'discount'   => [
+                                'currency_code' => $cart->cart_currency_code,
+                                'value'         => $this->smartButton->formatCurrencyValue((float) $cart->discount_amount),
+                            ],
+                        ],
+                    ],
+
+                    'items'    => $this->getLineItems($cart),
+                ],
+            ],
+        ];
+
+        if (! empty($cart->billing_address->phone)) {
+            $data['payer']['phone'] = [
+                'phone_type'   => 'MOBILE',
+
+                'phone_number' => [
+                    'national_number' => $this->smartButton->formatPhone($cart->billing_address->phone),
+                ],
+            ];
+        }
+
+        if (
+            $cart->haveStockableItems()
+            && $cart->shipping_address
+        ) {
+            $data['application_context']['shipping_preference'] = 'SET_PROVIDED_ADDRESS';
+
+            $data['purchase_units'][0] = array_merge($data['purchase_units'][0], [
+                'shipping' => [
+                    'address' => [
+                        'address_line_1' => current($billingAddressLines),
+                        'address_line_2' => last($billingAddressLines),
+                        'admin_area_2'   => $cart->shipping_address->city,
+                        'admin_area_1'   => $cart->shipping_address->state,
+                        'postal_code'    => $cart->shipping_address->postcode,
+                        'country_code'   => $cart->shipping_address->country,
+                    ],
+                ],
+            ]);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Return convert multiple address lines into 2 address lines.
+     *
+     * @param  string  $address
+     * @return array
+     */
+    private function getAddressLines($address)
+    {
+        $address = explode(PHP_EOL, $address, 2);
+
+        $addressLines = [current($address)];
+
+        if (isset($address[1])) {
+            $addressLines[] = str_replace(["\r\n", "\r", "\n"], ' ', last($address));
+        } else {
+            $addressLines[] = '';
+        }
+
+        return $addressLines;
+    }
+
+    /**
+     * Return cart items.
+     *
+     * @param  string  $cart
+     * @return array
+     */
+    private function getLineItems($cart)
+    {
+        $lineItems = [];
+
+        foreach ($cart->items as $item) {
+            $lineItems[] = [
+                'unit_amount' => [
+                    'currency_code' => $cart->cart_currency_code,
+                    'value'         => $this->smartButton->formatCurrencyValue((float) $item->price),
+                ],
+                'quantity'    => $item->quantity,
+                'name'        => $item->name,
+                'sku'         => $item->sku,
+                'category'    => $item->getTypeInstance()->isStockable() ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
+            ];
+        }
+
+        return $lineItems;
     }
 }

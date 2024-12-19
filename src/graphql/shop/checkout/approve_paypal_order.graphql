@@ -1,0 +1,15 @@
+# Shop\Checkout\ApprovePaypalOrder Related API
+extend type Mutation {
+    approvePaypalOrder (
+        input: ApprovePaypalOrderInput! @spread
+    ): ApprovedPaypalOrderResponse @field(resolver: "Webkul\\GraphQLAPI\\Mutations\\Shop\\Customer\\CheckoutMutation@paypalApproved")
+}
+
+input ApprovePaypalOrderInput {
+    code: String!
+}
+
+type ApprovedPaypalOrderResponse {
+    success: Boolean!
+    order: Order
+}
