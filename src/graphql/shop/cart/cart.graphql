@@ -51,6 +51,7 @@ input BookingInput {
     date: String!
     slot: String!
     note: String
+    is_shared: Int!
 }
 
 input ConfigurableProductInput {
