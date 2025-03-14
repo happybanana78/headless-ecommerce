@@ -235,6 +235,8 @@ type BookingProductTableSlot {
     breakTime: Int! @rename(attribute: "break_time")
     preventSchedulingBefore: Int! @rename(attribute: "prevent_scheduling_before")
     sameSlotAllDays: Boolean @rename(attribute: "same_slot_all_days")
+    sharedSlots: Int! @rename(attribute: "shared_slots")
+    sharedPrice: Float! @rename(attribute: "shared_price")
     slots: JSON @field(resolver: "Webkul\\GraphQLAPI\\Queries\\Admin\\Catalog\\Products\\ProductContent@getFormattedTableSlots")
 }
 
