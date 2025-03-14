@@ -49,6 +49,7 @@ type CartItemBooking {
     note: String
     slot: String
     isShared: Int @rename(attribute: "is_shared")
+    vanPrice: Float @rename(attribute: "van_price")
 }
 
 input FilterCustomerAddressInput {
