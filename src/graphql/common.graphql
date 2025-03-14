@@ -48,6 +48,7 @@ type CartItemBooking {
     date: Date
     note: String
     slot: String
+    isShared: Int @rename(attribute: "is_shared")
 }
 
 input FilterCustomerAddressInput {
