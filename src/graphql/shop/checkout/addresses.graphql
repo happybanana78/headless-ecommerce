@@ -20,4 +20,5 @@ type FormattedAddress {
     city: String!
     postcode: String!
     phone: String!
+    notes: String
 }
