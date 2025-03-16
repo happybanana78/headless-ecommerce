@@ -109,6 +109,7 @@ class CartMutation extends Controller
             'qty'                => 'required|array',
             'qty.*.cart_item_id' => 'required|integer|exists:cart_items,id',
             'qty.*.quantity'     => 'required|integer|min:1',
+            'qty.*.operator'     => 'required|in:remove,add',
         ]);
 
         try {
@@ -119,7 +120,10 @@ class CartMutation extends Controller
                     throw new CustomException(trans('bagisto_graphql::app.shop.checkout.cart.item.fail.item-not-found'));
                 }
 
-                $qty[$item['cart_item_id']] = $item['quantity'] ?: 1;
+                $qty[$item['cart_item_id']] = [
+                    'quantity' => $item['quantity'] ?: 1,
+                    'operator' => $item['operator'],
+                ];
             }
 
             $args['qty'] = $qty;
